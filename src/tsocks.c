@@ -60,12 +60,16 @@ From 'man compat' in OSX:
      is always on (the _DARWIN_FEATURE_UNIX_CONFORMANCE macro will also be defined to the SUS conformance
      level).  Defining _NONSTD_SOURCE will cause a compilation error.
 */
-#if !defined(__LP64__)
+/*Don't set _NONSTD_SOURCE when building for iPhoneOS*/
+#if !defined(__LP64__) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
 #define _NONSTD_SOURCE 1
 #endif
 #include <sys/socket.h>
 #endif
 
+#if (defined(__APPLE__) || defined(__darwin__)) && !defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+#define _APPLE_OSX
+#endif
 
 #ifdef USE_GNU_SOURCE
 #define _GNU_SOURCE
@@ -117,19 +121,19 @@ int (*realgetaddrinfo)(GETADDRINFO_SIGNATURE);
 static struct hostent *(*realgetipnodebyname)(GETIPNODEBYNAME_SIGNATURE);
 static ssize_t (*realsendto)(SENDTO_SIGNATURE);
 static ssize_t (*realsendmsg)(SENDMSG_SIGNATURE);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 static ssize_t (*realsendto_unix2003)(SENDTO_SIGNATURE);
 static ssize_t (*realsendto_nocancel)(SENDTO_SIGNATURE);
 static ssize_t (*realsendmsg_unix2003)(SENDMSG_SIGNATURE);
 static ssize_t (*realsendmsg_nocancel)(SENDMSG_SIGNATURE);
-#endif
+#endif /*_APPLE_OSX*/
 #endif /*USE_TOR_DNS*/
 int (*realconnect)(CONNECT_SIGNATURE);
 static int (*realselect)(SELECT_SIGNATURE);
 static int (*realpoll)(POLL_SIGNATURE);
 int (*realclose)(CLOSE_SIGNATURE);
 static int (*realgetpeername)(GETPEERNAME_SIGNATURE);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 static int (*realconnect_unix2003)(CONNECT_SIGNATURE);
 static int (*realconnect_nocancel)(CONNECT_SIGNATURE);
 static int (*realselect_darwinextsn)(SELECT_SIGNATURE);
@@ -141,7 +145,7 @@ static int (*realpoll_nocancel)(POLL_SIGNATURE);
 static int (*realclose_unix2003)(CLOSE_SIGNATURE);
 static int (*realclose_nocancel)(CLOSE_SIGNATURE);
 static int (*realgetpeername_unix2003)(GETPEERNAME_SIGNATURE);
-#endif
+#endif /*_APPLE_OSX*/
 
 static struct parsedfile *config;
 static struct connreq *requests = NULL;
@@ -156,7 +160,7 @@ int select(SELECT_SIGNATURE);
 int poll(POLL_SIGNATURE);
 int close(CLOSE_SIGNATURE);
 int getpeername(GETPEERNAME_SIGNATURE);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 int connect_unix2003(CONNECT_SIGNATURE) __asm("_connect$UNIX2003");
 int connect_nocancel(CONNECT_SIGNATURE) __asm("_connect$NOCANCEL$UNIX2003");
 int select_darwinextsn(SELECT_SIGNATURE) __asm("_select$DARWIN_EXTSN");
@@ -168,7 +172,7 @@ int poll_nocancel(POLL_SIGNATURE) __asm("_poll$NOCANCEL$UNIX2003");
 int close_unix2003(CLOSE_SIGNATURE) __asm("_close$UNIX2003");
 int close_nocancel(CLOSE_SIGNATURE) __asm("_close$NOCANCEL$UNIX2003");
 int getpeername_unxi2003(GETPEERNAME_SIGNATURE) __asm("_getpeername$UNIX2003");
-#endif
+#endif /*_APPLE_OSX*/
 
 #ifdef SUPPORT_RES_API
 int res_init(void);
@@ -176,7 +180,7 @@ int res_query(RES_QUERY_SIGNATURE);
 int res_search(RES_SEARCH_SIGNATURE);
 int res_querydomain(RES_QUERYDOMAIN_SIGNATURE);
 int res_send(RES_SEND_SIGNATURE);
-#endif
+#endif /*SUPPORT_RES_API*/
 #ifdef USE_TOR_DNS
 struct hostent *gethostbyname(GETHOSTBYNAME_SIGNATURE);
 struct hostent *gethostbyaddr(GETHOSTBYADDR_SIGNATURE);
@@ -184,12 +188,12 @@ int getaddrinfo(GETADDRINFO_SIGNATURE);
 struct hostent *getipnodebyname(GETIPNODEBYNAME_SIGNATURE);
 ssize_t sendto(SENDTO_SIGNATURE);
 ssize_t sendmsg(SENDMSG_SIGNATURE);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 ssize_t sendto_unix2003(SENDTO_SIGNATURE) __asm("_sendto$UNIX2003");
 ssize_t sendto_nocancel(SENDTO_SIGNATURE) __asm("_sendto$NOCANCEL$UNIX2003");
 ssize_t sendmsg_unix2003(SENDMSG_SIGNATURE) __asm("_sendmsg$UNIX2003");
 ssize_t sendmsg_nocancel(SENDMSG_SIGNATURE) __asm("_sendmsg$NOCANCEL$UNIX2003");
-#endif
+#endif /*_APPLE_OSX*/
 #endif /*USE_TOR_DNS*/
 
 /* Private Function Prototypes */
@@ -269,16 +273,16 @@ void tsocks_init(void) {
 #ifndef USE_OLD_DLSYM
     if ((realconnect = dlsym(RTLD_NEXT, "connect")) == NULL)
       LOAD_ERROR("connect", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realconnect_unix2003 = dlsym(RTLD_NEXT, "connect$UNIX2003")) == NULL)
       LOAD_ERROR("connect$UNIX2003", MSGERR);
     if ((realconnect_nocancel = dlsym(RTLD_NEXT, "connect$NOCANCEL$UNIX2003")) == NULL)
       LOAD_ERROR("connect$NOCANCEL$UNIX2003", MSGERR);
-#endif
+#endif /*_APPLE_OSX*/
 
     if ((realselect = dlsym(RTLD_NEXT, "select")) == NULL)
       LOAD_ERROR("select", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realselect_darwinextsn = dlsym(RTLD_NEXT, "select$DARWIN_EXTSN")) == NULL)
       LOAD_ERROR("select$DARWIN_EXTSN", MSGERR);
     if ((realselect_darwinextsn_nocancel = dlsym(RTLD_NEXT, "select$DARWIN_EXTSN$NOCANCEL")) == NULL)
@@ -287,34 +291,34 @@ void tsocks_init(void) {
       LOAD_ERROR("select$UNIX2003", MSGERR);
     if ((realselect_nocancel = dlsym(RTLD_NEXT, "select$NOCANCEL$UNIX2003")) == NULL)
       LOAD_ERROR("select$NOCANCEL$UNIX2003", MSGERR);
-#endif
+#endif /*_APPLE_OSX*/
 
     if ((realpoll = dlsym(RTLD_NEXT, "poll")) == NULL)
       LOAD_ERROR("poll", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realpoll_unix2003 = dlsym(RTLD_NEXT, "poll$UNIX2003")) == NULL)
       LOAD_ERROR("poll$UNIX2003", MSGERR);
     if ((realpoll_nocancel = dlsym(RTLD_NEXT, "poll$NOCANCEL$UNIX2003")) == NULL)
       LOAD_ERROR("poll$NOCANCEL$UNIX2003", MSGERR);
-#endif
+#endif /*_APPLE_OSX*/
 
     if ((realclose = dlsym(RTLD_NEXT, "close")) == NULL)
       LOAD_ERROR("close", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realclose_unix2003 = dlsym(RTLD_NEXT, "close$UNIX2003")) == NULL)
       LOAD_ERROR("close$UNIX2003", MSGERR);
     if ((realclose_nocancel = dlsym(RTLD_NEXT, "close$NOCANCEL$UNIX2003")) == NULL)
       LOAD_ERROR("close$NOCANCEL$UNIX2003", MSGERR);
-#endif
+#endif /*_APPLE_OSX*/
 
     if ((realgetpeername = dlsym(RTLD_NEXT, "getpeername")) == NULL)
       LOAD_ERROR("getpeername", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realgetpeername_unix2003 = dlsym(RTLD_NEXT, "getpeername$UNIX2003")) == NULL)
       LOAD_ERROR("getpeername$UNIX2003", MSGERR);
-#endif
+#endif /*_APPLE_OSX*/
 
-    #ifdef SUPPORT_RES_API
+#ifdef SUPPORT_RES_API
     if ((realresinit = dlsym(RTLD_NEXT, "res_init")) == NULL)
       LOAD_ERROR("res_init", MSGERR);
     if ((realresquery = dlsym(RTLD_NEXT, "res_query")) == NULL)
@@ -325,8 +329,8 @@ void tsocks_init(void) {
       LOAD_ERROR("res_querydomain", MSGERR);
     if ((realressend = dlsym(RTLD_NEXT, "res_send")) == NULL)
       LOAD_ERROR("res_send", MSGERR);
-    #endif
-    #ifdef USE_TOR_DNS
+#endif /*SUPPORT_RES_API*/
+#ifdef USE_TOR_DNS
     if ((realgethostbyname = dlsym(RTLD_NEXT, "gethostbyname")) == NULL)
       LOAD_ERROR("gethostbyname", MSGERR);
     if ((realgethostbyaddr = dlsym(RTLD_NEXT, "gethostbyaddr")) == NULL)
@@ -340,40 +344,42 @@ void tsocks_init(void) {
 
     if ((realsendto = dlsym(RTLD_NEXT, "sendto")) == NULL)
       LOAD_ERROR("sendto", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realsendto_unix2003 = dlsym(RTLD_NEXT, "sendto$UNIX2003")) == NULL)
       LOAD_ERROR("sendto$UNIX2003", MSGERR);
     if ((realsendto_nocancel = dlsym(RTLD_NEXT, "sendto$NOCANCEL$UNIX2003")) == NULL)
       LOAD_ERROR("sendto$NOCANCEL$UNIX2003", MSGERR);
-#endif
+#endif /*_APPLE_OSX*/
 
     if ((realsendmsg = dlsym(RTLD_NEXT, "sendmsg")) == NULL)
       LOAD_ERROR("sendmsg", MSGERR);
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
     if ((realsendmsg_unix2003 = dlsym(RTLD_NEXT, "sendmsg$UNIX2003")) == NULL)
       LOAD_ERROR("sendmsg$UNIX2003", MSGERR);
     if ((realsendmsg_nocancel = dlsym(RTLD_NEXT, "sendmsg$NOCANCEL$UNIX2003")) == NULL)
       LOAD_ERROR("sendmsg$NOCANCEL$UNIX2003", MSGERR);
-#endif
-    #endif /*USE_TOR_DNS*/
-#else
+#endif /*_APPLE_OSX*/
+#endif /*USE_TOR_DNS*/
+
+#else /*USE_OLD_DLSYM*/
+
     lib = dlopen(LIBCONNECT, RTLD_LAZY);
     realconnect = dlsym(lib, "connect");
     realselect = dlsym(lib, "select");
     realpoll = dlsym(lib, "poll");
-    #ifdef USE_TOR_DNS
+#ifdef USE_TOR_DNS
     realgethostbyname = dlsym(lib, "gethostbyname");
     realgethostbyaddr = dlsym(lib, "gethostbyaddr");
     realgetaddrinfo = dlsym(lib, "getaddrinfo");
     realgetipnodebyname = dlsym(lib, "getipnodebyname");
     realsendto = dlsym(lib, "sendto");
     realsendmsg = dlsym(lib, "sendmsg");
-    #endif
+#endif /*USE_TOR_DNS*/
     dlclose(lib);
     lib = dlopen(LIBC, RTLD_LAZY);
     realclose = dlsym(lib, "close");
     dlclose(lib);
-    #ifdef SUPPORT_RES_API
+#ifdef SUPPORT_RES_API
     lib = dlopen(LIBRESOLV, RTLD_LAZY);
     realresinit = dlsym(lib, "res_init");
     realresquery = dlsym(lib, "res_query");
@@ -381,13 +387,14 @@ void tsocks_init(void) {
     realresquerydomain = dlsym(lib, "res_querydomain");
     realressearch = dlsym(lib, "res_search");
     dlclose(lib);
-    #endif
-#endif
+#endif /*SUPPORT_RES_API*/
+#endif /*USE_OLD_DLSYM*/
+
 #ifdef USE_TOR_DNS
     /* Unfortunately, we can't do this lazily because otherwise our mmap'd
        area won't be shared across fork()s. */
     deadpool_init();
-#endif
+#endif /*USE_TOR_DNS*/
 
 }
 
@@ -453,10 +460,10 @@ static int get_config () {
     return tsocks_connect_guts(__fd, __addr, __len, real ## funcname); \
   }
 PATCH_CONNECT(connect, "connect")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_CONNECT(connect_unix2003, "conncect$UNIX2003")
 PATCH_CONNECT(connect_nocancel, "conncect$NOCANCEL$UNIX2003")
-#endif
+#endif /*_APPLE_OSX*/
 
 #define PATCH_CLOSE(funcname, symbolname) \
   int funcname(CLOSE_SIGNATURE) { \
@@ -468,7 +475,7 @@ PATCH_CONNECT(connect_nocancel, "conncect$NOCANCEL$UNIX2003")
     return tsocks_close_guts(fd, real ## funcname); \
   }
 PATCH_CLOSE(close, "close")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_CLOSE(close_unix2003, "close$UNIX2003")
 PATCH_CLOSE(close_nocancel, "close$NOCANCEL$UNIX2003")
 #endif
@@ -483,7 +490,7 @@ PATCH_CLOSE(close_nocancel, "close$NOCANCEL$UNIX2003")
     return tsocks_select_guts(n, readfds, writefds, exceptfds, timeout, real ## funcname); \
   }
 PATCH_SELECT(select, "select")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_SELECT(select_darwinextsn, "select$DARWIN_EXTSN")
 PATCH_SELECT(select_darwinextsn_nocancel, "select$DARWIN_EXTSN$NOCANCEL")
 PATCH_SELECT(select_unix2003, "select$UNIX2003")
@@ -500,7 +507,7 @@ PATCH_SELECT(select_nocancel, "select$NOCANCEL$UNIX2003")
     return tsocks_poll_guts(ufds, nfds, timeout, real ## funcname); \
   }
 PATCH_POLL(poll, "poll")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_POLL(poll_unix2003, "poll$UNIX2003")
 PATCH_POLL(poll_nocancel, "poll$NOCANCEL$UNIX2003")
 #endif
@@ -515,7 +522,7 @@ PATCH_POLL(poll_nocancel, "poll$NOCANCEL$UNIX2003")
     return tsocks_getpeername_guts(__fd, __name, __namelen, real ## funcname); \
   }
 PATCH_GETPEERNAME(getpeername, "getpeername")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_GETPEERNAME(getpeername_unix2003, "getpeername$UNIX2003")
 #endif
 
@@ -529,7 +536,7 @@ PATCH_GETPEERNAME(getpeername_unix2003, "getpeername$UNIX2003")
     return tsocks_sendto_guts(s, buf, len, flags, to, tolen, real ## funcname); \
   }
 PATCH_SENDTO(sendto, "sendto")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_SENDTO(sendto_unix2003, "sendto$UNIX2003")
 PATCH_SENDTO(sendto_nocancel, "sendto$NOCANCEL$UNIX2003")
 #endif
@@ -544,7 +551,7 @@ PATCH_SENDTO(sendto_nocancel, "sendto$NOCANCEL$UNIX2003")
     return tsocks_sendmsg_guts(s, msg, flags, real ## funcname); \
   }
 PATCH_SENDMSG(sendmsg, "sendmsg")
-#if defined(__APPLE__) || defined(__darwin__)
+#ifdef _APPLE_OSX
 PATCH_SENDMSG(sendmsg_unix2003, "sendmsg$UNIX2003")
 PATCH_SENDMSG(sendmsg_nocancel, "sendmsg$NOCANCEL$UNIX2003")
 #endif
